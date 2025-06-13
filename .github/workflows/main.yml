@@ -33,9 +33,7 @@ jobs:
 
   build:
     name: Build & Archive Docker Image
-    # uruchom, jeśli to main LUB (test i lint zakończone sukcesem)
-    # if: ${{ github.ref == 'refs/heads/main' || (needs.lint.result == 'success' && needs.unit_tests.result == 'success') }}
-    if: ${{ (needs.lint.result == 'success' && needs.unit_tests.result == 'success') }}
+    if: ${{ github.ref == 'refs/heads/main' || (needs.lint.result == 'success' && needs.unit_tests.result == 'success') }}
     needs:
       - lint
       - unit_tests
