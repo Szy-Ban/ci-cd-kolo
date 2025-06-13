@@ -1,46 +1,53 @@
-name: Zaawansowany CI/CD
+name: Advanced CI/CD
 
 on:
   push: {}
 
 jobs:
-  test:
-    name: Testy jednostkowe
+  unit_tests:
+    name: Unit Tests
     if: ${{ github.ref != 'refs/heads/main' }}
     runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci
-      - run: npm test
+      - name: Install dependencies
+        run: npm install
+      - name: Run tests
+        run: npm test
 
   lint:
-    name: ESLint
+    name: Lint
     if: ${{ github.ref != 'refs/heads/main' }}
     runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci
-      - run: npm run lint
+      - name: Install dependencies
+        run: npm install
+      - name: Run lint
+        run: npm run lint
 
   build:
-    name: Build & Push Docker
-    needs: [test, lint]
+    name: Build and Push Docker
+    needs: [unit_tests, lint]
     runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
-      - name: Build + Push
+
+      - name: Build and push image
+        shell: bash               # <- wymuszamy bash na Windows runnerze
         run: |
           TAG=szyban/ci-cd-kolo:${{ github.sha }}
           docker build -t $TAG .
           docker push $TAG
           echo "$TAG" > image-tag.txt
-      - uses: actions/upload-artifact@v4         
+
+      - uses: actions/upload-artifact@v4
         with:
           name: image-tag
           path: image-tag.txt
 
-  staging:
-    name: Deploy na STAGING
+  deploy_staging:
+    name: Deploy to staging
     needs: build
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted]
@@ -49,13 +56,14 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: image-tag
-      - run: |
+      - name: Deploy staging
+        run: |
           TAG=$(cat image-tag.txt)
-          echo "Wdrażam na staging obraz: $TAG"
+          echo "Deploying to staging: $TAG"
 
-  production:
-    name: Deploy na PRODUCTION
-    needs: staging
+  deploy_production:
+    name: Deploy to production
+    needs: deploy_staging
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted]
     environment: production
@@ -63,22 +71,24 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: image-tag
-      - run: |
+      - name: Deploy production
+        run: |
           TAG=$(cat image-tag.txt)
-          echo "Publikuję na produkcji obraz: $TAG"
+          echo "Deploying to production: $TAG"
 
-  notify:
-    name: Raport końcowy
-    needs: [build, staging, production]
+  report:
+    name: Generate report
+    needs: [build, deploy_staging, deploy_production]
     if: always()
     runs-on: [self-hosted]
     steps:
-      - run: |
-          echo "Pipeline zakończony z wynikiem: ${{ job.status }}" > report.txt
-          echo "build: ${{ needs.build.result }}"       >> report.txt
-          echo "staging: ${{ needs.staging.result }}"   >> report.txt
-          echo "production: ${{ needs.production.result }}" >> report.txt
-      - uses: actions/upload-artifact@v4         
+      - name: Create report
+        run: |
+          echo "Pipeline status: ${{ job.status }}" > report.txt
+          echo "build: ${{ needs.build.result }}" >> report.txt
+          echo "staging: ${{ needs.deploy_staging.result }}" >> report.txt
+          echo "production: ${{ needs.deploy_production.result }}" >> report.txt
+      - uses: actions/upload-artifact@v4
         with:
           name: ci-report
           path: report.txt
