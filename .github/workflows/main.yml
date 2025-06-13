@@ -1,10 +1,10 @@
 name: CI/CD Pipeline
- 
+
 on:
   push:
     branches:
       - '**'
- 
+
 jobs:
   lint:
     if: github.ref != 'refs/heads/main'
@@ -17,7 +17,7 @@ jobs:
           node-version: '18'
       - run: npm install
       - run: npm run lint
- 
+
   unit_tests:
     if: github.ref != 'refs/heads/main'
     name: Unit Tests
@@ -29,7 +29,7 @@ jobs:
           node-version: '18'
       - run: npm install
       - run: npm test
- 
+
   build:
     if: always()
     name: Build & Archive Docker Image
@@ -46,7 +46,7 @@ jobs:
         with:
           name: docker-image
           path: image.tar
- 
+
   deploy_staging:
     if: always() && github.ref == 'refs/heads/main'
     name: Deploy to Staging
@@ -58,8 +58,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: docker-image
-      - run: echo ">>> Symulacja obraz wdrożony na staging."
- 
+      - run: echo ">>> Symulacja: obraz wdrożony na staging."
+
   deploy_production:
     if: always() && github.ref == 'refs/heads/main'
     name: Deploy to Production
@@ -71,9 +71,17 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: docker-image
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - run: docker load -i image.tar
       - run: docker push szyban/ci-cd-kolo:latest
- 
+
   final_report:
     name: Final Report
     runs-on: ubuntu-latest
