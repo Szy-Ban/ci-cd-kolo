@@ -1,103 +1,84 @@
-# .github/workflows/main.yml
 name: Zaawansowany CI/CD
 
 on:
-  push: {}       # każdy push do dowolnej gałęzi
+  push: {}
 
 jobs:
-  # ── a) Testy jednostkowe (nie na main) ────────────────
   test:
-    name: 🧪 Testy jednostkowe
+    name: Testy jednostkowe
     if: ${{ github.ref != 'refs/heads/main' }}
     runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
-      - name: Instalacja zależności
-        run: npm ci
-      - name: Uruchom testy
-        run: npm test
+      - run: npm ci
+      - run: npm test
 
-  # ── a) Lint (nie na main) ─────────────────────────────
   lint:
-    name: 📏 ESLint
+    name: ESLint
     if: ${{ github.ref != 'refs/heads/main' }}
     runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
-      - name: Instalacja zależności
-        run: npm ci
-      - name: Uruchom lint
-        run: npm run lint
+      - run: npm ci
+      - run: npm run lint
 
-  # ── b) Build & push Docker (nie na main) ──────────────
   build:
-    name: 🐳 Build & Push Docker
+    name: Build & Push Docker
     needs: [test, lint]
-    if: ${{ github.ref != 'refs/heads/main' }}
     runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
-      - name: Budowanie i push
+      - name: Build + Push
         run: |
           TAG=szyban/ci-cd-kolo:${{ github.sha }}
           docker build -t $TAG .
           docker push $TAG
           echo "$TAG" > image-tag.txt
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4         
         with:
           name: image-tag
           path: image-tag.txt
 
-  # ── c) Deploy na staging (Tylko main, manualny approve) ─
   staging:
-    name: 🚀 Deploy na STAGING
+    name: Deploy na STAGING
     needs: build
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted]
-    environment:
-      name: staging
+    environment: staging
     steps:
       - uses: actions/download-artifact@v3
         with:
           name: image-tag
-      - name: Symulacja wdrożenia na staging
-        run: |
+      - run: |
           TAG=$(cat image-tag.txt)
           echo "Wdrażam na staging obraz: $TAG"
 
-  # ── d) Deploy na production (Tylko main, manualny approve) ─
   production:
-    name: 🛡️ Deploy na PRODUCTION
+    name: Deploy na PRODUCTION
     needs: staging
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted]
-    environment:
-      name: production
+    environment: production
     steps:
       - uses: actions/download-artifact@v3
         with:
           name: image-tag
-      - name: Symulacja wypchnięcia do produkcji
-        run: |
+      - run: |
           TAG=$(cat image-tag.txt)
           echo "Publikuję na produkcji obraz: $TAG"
 
-  # ── e) Generowanie raportu (zawsze) ────────────────────
   notify:
-    name: 📣 Raport końcowy
-    needs: [test, lint, build, staging, production]
+    name: Raport końcowy
+    needs: [build, staging, production]
     if: always()
     runs-on: [self-hosted]
     steps:
-      - name: Generuj report.txt
-        run: |
+      - run: |
           echo "Pipeline zakończony z wynikiem: ${{ job.status }}" > report.txt
-          echo "test: ${{ needs.test.result }}" >> report.txt
-          echo "lint: ${{ needs.lint.result }}" >> report.txt
-          echo "build: ${{ needs.build.result }}" >> report.txt
-          echo "staging: ${{ needs.staging.result }}" >> report.txt
+          echo "build: ${{ needs.build.result }}"       >> report.txt
+          echo "staging: ${{ needs.staging.result }}"   >> report.txt
           echo "production: ${{ needs.production.result }}" >> report.txt
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4         
         with:
           name: ci-report
           path: report.txt
