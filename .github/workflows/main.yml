@@ -40,8 +40,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - run: docker build -t jakfah/ci-cd-kolo:latest .
-      - run: docker save jakfah/ci-cd-kolo:latest -o image.tar
+      - run: docker build -t szyban/ci-cd-kolo:latest .
+      - run: docker save szyban/ci-cd-kolo:latest -o image.tar
       - uses: actions/upload-artifact@v4
         with:
           name: docker-image
@@ -72,7 +72,7 @@ jobs:
         with:
           name: docker-image
       - run: docker load -i image.tar
-      - run: docker push jakfah/ci-cd-kolo:latest
+      - run: docker push szyban/ci-cd-kolo:latest
  
   final_report:
     name: Final Report
